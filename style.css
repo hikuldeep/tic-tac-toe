@@ -13,6 +13,7 @@
     --board-bg: #161625;
     --cell-bg: #2f3542;
     --cell-hover: #3d4454;
+    --grid-size: 3;
     --cell-size: 100px;
     --x-color: #1e90ff;
     --o-color: #ffa502;
@@ -238,7 +239,7 @@ select:disabled {
     border: 1px solid var(--border-color);
     box-shadow: var(--shadow);
     width: 100%;
-    max-width: 360px;
+    max-width: 390px;
 }
 
 .score-box {
@@ -252,6 +253,15 @@ select:disabled {
     font-size: 1.45rem;
     font-weight: bold;
     margin-top: 4px;
+}
+
+.streak-tag {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--muted-text);
+    letter-spacing: 0.3px;
 }
 
 .x-color { color: var(--x-color); }
@@ -268,13 +278,17 @@ select:disabled {
 
 .board {
     display: grid;
-    grid-template-columns: repeat(3, var(--cell-size));
-    grid-template-rows: repeat(3, var(--cell-size));
+    grid-template-columns: repeat(var(--grid-size), var(--cell-size));
+    grid-template-rows: repeat(var(--grid-size), var(--cell-size));
     gap: 10px;
     background: var(--board-bg);
     padding: 12px;
     border-radius: 16px;
     box-shadow: var(--shadow);
+}
+
+.board.board-4x4 {
+    --cell-size: 80px;
 }
 
 .cell {
@@ -404,6 +418,10 @@ select:disabled {
         --cell-size: 88px;
     }
 
+    .board.board-4x4 {
+        --cell-size: 68px;
+    }
+
     .header-container {
         justify-content: center;
         text-align: center;
@@ -425,6 +443,10 @@ select:disabled {
 @media (max-width: 400px) {
     :root {
         --cell-size: 76px;
+    }
+
+    .board.board-4x4 {
+        --cell-size: 58px;
     }
 
     .scoreboard {

@@ -44,15 +44,21 @@
             </div>
         </div>
 
-        <!-- Game Mode & Difficulty Controls -->
+        <!-- Game Mode, Board Size, Difficulty & Reset Controls -->
         <div class="controls">
             <select id="gameMode" onchange="handleModeChange()">
                 <option value="pvp">2 Players (Local)</option>
                 <option value="ai">Vs Computer (AI)</option>
             </select>
 
+            <select id="boardSize" onchange="handleBoardSizeChange()">
+                <option value="3" selected>Board: 3x3</option>
+                <option value="4">Board: 4x4</option>
+            </select>
+
             <select id="difficulty" onchange="resetGame(false)" disabled>
                 <option value="easy">AI: Easy</option>
+                <option value="medium">AI: Medium</option>
                 <option value="hard" selected>AI: Hard</option>
             </select>
 
@@ -64,24 +70,26 @@
             <!-- Left/Center: Board & Scoreboard -->
             <section class="board-section">
                 <div class="scoreboard">
-                    <div class="score-box x-color" id="labelP1">Kuldeep (X) <span id="scoreP1">0</span></div>
-                    <div class="score-box">Draws <span id="scoreDraw">0</span></div>
-                    <div class="score-box o-color" id="labelP2">Player 2 (O) <span id="scoreP2">0</span></div>
+                    <div class="score-box x-color" id="labelP1">
+                        Kuldeep (X)
+                        <span id="scoreP1">0</span>
+                        <small class="streak-tag" id="streakP1">Streak: 0</small>
+                    </div>
+                    <div class="score-box">
+                        Draws
+                        <span id="scoreDraw">0</span>
+                        <small class="streak-tag"> </small>
+                    </div>
+                    <div class="score-box o-color" id="labelP2">
+                        Player 2 (O)
+                        <span id="scoreP2">0</span>
+                        <small class="streak-tag" id="streakP2">Streak: 0</small>
+                    </div>
                 </div>
 
                 <div class="status" id="status">Kuldeep's Turn (X)</div>
 
-                <div class="board" id="board">
-                    <div class="cell" data-index="0"></div>
-                    <div class="cell" data-index="1"></div>
-                    <div class="cell" data-index="2"></div>
-                    <div class="cell" data-index="3"></div>
-                    <div class="cell" data-index="4"></div>
-                    <div class="cell" data-index="5"></div>
-                    <div class="cell" data-index="6"></div>
-                    <div class="cell" data-index="7"></div>
-                    <div class="cell" data-index="8"></div>
-                </div>
+                <div class="board" id="board"></div>
             </section>
 
             <!-- Right: Live Move Log & Match History -->
@@ -110,7 +118,7 @@
 
     <!-- Footer Section -->
     <footer class="site-footer">
-        <p>X always goes first. Align 3 symbols in a row, column, or diagonal to win.</p>
+        <p id="ruleHint">X always goes first. Align 3 in a row, column, or diagonal to win.</p>
         <p class="copyright">© 2026 Tic-Tac-Toe Web Game | Built by Kuldeep Singh</p>
     </footer>
 

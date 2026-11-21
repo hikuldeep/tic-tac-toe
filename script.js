@@ -1,27 +1,32 @@
-const cells = document.querySelectorAll('.cell');
+const boardEl = document.getElementById('board');
 const statusText = document.getElementById('status');
 const gameModeSelect = document.getElementById('gameMode');
+const boardSizeSelect = document.getElementById('boardSize');
 const difficultySelect = document.getElementById('difficulty');
 const player1Input = document.getElementById('player1Name');
 const player2Input = document.getElementById('player2Name');
 const player1SymbolSelect = document.getElementById('player1Symbol');
 const labelP1 = document.getElementById('labelP1');
 const labelP2 = document.getElementById('labelP2');
-const scoreDrawEl = document.getElementById('scoreDraw');
 const soundToggleBtn = document.getElementById('soundToggle');
 const themeToggleBtn = document.getElementById('themeToggle');
 const moveLogEl = document.getElementById('moveLog');
 const matchHistoryEl = document.getElementById('matchHistory');
+const ruleHintEl = document.getElementById('ruleHint');
 
 const STORAGE_KEYS = {
     theme: "ttt_theme_v1",
     sound: "ttt_sound_v1",
     scores: "ttt_scores_v1",
+    streaks: "ttt_streaks_v1",
     history: "ttt_history_v1",
     round: "ttt_round_v1"
 };
 
-let board = ["", "", "", "", "", "", "", "", ""];
+let gridSize = 3;
+let board = [];
+let cells = [];
+let winConditions = [];
 let currentSymbol = "X"; // X always starts first
 let gameActive = true;
 let isAiThinking = false;
@@ -29,13 +34,8 @@ let soundEnabled = true;
 let moveCount = 0;
 let roundNumber = 1;
 let scores = { P1: 0, P2: 0, Draw: 0 };
+let streaks = { P1: 0, P2: 0 };
 let pastRounds = [];
-
-const cellCoords = [
-    "R1, C1", "R1, C2", "R1, C3",
-    "R2, C1", "R2, C2", "R2, C3",
-    "R3, C1", "R3, C2", "R3, C3"
-];
 
 // LocalStorage Helpers
 function saveToStorage(key, value) {
@@ -93,6 +93,14 @@ function loadSavedPreferences() {
         };
     }
 
+    const savedStreaks = loadFromStorage(STORAGE_KEYS.streaks, null);
+    if (savedStreaks && typeof savedStreaks.P1 === "number") {
+        streaks = {
+            P1: savedStreaks.P1,
+            P2: savedStreaks.P2
+        };
+    }
+
     const savedHistory = loadFromStorage(STORAGE_KEYS.history, []);
     if (Array.isArray(savedHistory)) {
         pastRounds = savedHistory;
@@ -102,6 +110,73 @@ function loadSavedPreferences() {
     roundNumber = Number.isFinite(savedRound) && savedRound > 0 ? savedRound : 1;
 
     renderMatchHistory();
+}
+
+// Board Size & Winning Conditions Builder
+function generateWinConditions(size) {
+    const lines = [];
+
+    // Rows
+    for (let r = 0; r < size; r++) {
+        const row = [];
+        for (let c = 0; c < size; c++) {
+            row.push(r * size + c);
+        }
+        lines.push(row);
+    }
+
+    // Columns
+    for (let c = 0; c < size; c++) {
+        const col = [];
+        for (let r = 0; r < size; r++) {
+            col.push(r * size + c);
+        }
+        lines.push(col);
+    }
+
+    // Main Diagonal
+    const diag1 = [];
+    for (let i = 0; i < size; i++) {
+        diag1.push(i * size + i);
+    }
+    lines.push(diag1);
+
+    // Anti Diagonal
+    const diag2 = [];
+    for (let i = 0; i < size; i++) {
+        diag2.push(i * size + (size - 1 - i));
+    }
+    lines.push(diag2);
+
+    return lines;
+}
+
+function getCoordLabel(index, size) {
+    const row = Math.floor(index / size) + 1;
+    const col = (index % size) + 1;
+    return `R${row}, C${col}`;
+}
+
+function buildBoardGrid(size) {
+    boardEl.innerHTML = "";
+    boardEl.style.setProperty("--grid-size", size);
+    boardEl.classList.toggle("board-4x4", size === 4);
+
+    const totalCells = size * size;
+    board = Array(totalCells).fill("");
+    cells = [];
+
+    for (let i = 0; i < totalCells; i++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.setAttribute("data-index", i);
+        cell.addEventListener("click", handleCellClick);
+        boardEl.appendChild(cell);
+        cells.push(cell);
+    }
+
+    winConditions = generateWinConditions(size);
+    ruleHintEl.textContent = `X always goes first. Align ${size} in a row, column, or diagonal to win.`;
 }
 
 // Web Audio API Sound Synthesizer
@@ -206,9 +281,20 @@ function updatePlayerLabels() {
     labelP1.className = `score-box ${p1Sym === "X" ? "x-color" : "o-color"}`;
     labelP2.className = `score-box ${p2Sym === "X" ? "x-color" : "o-color"}`;
 
-    labelP1.innerHTML = `${getPlayer1Name()} (${p1Sym}) <span id="scoreP1">${scores.P1}</span>`;
-    labelP2.innerHTML = `${getPlayer2Name()} (${p2Sym}) <span id="scoreP2">${scores.P2}</span>`;
-    scoreDrawEl.textContent = scores.Draw;
+    labelP1.innerHTML = `
+        ${getPlayer1Name()} (${p1Sym})
+        <span id="scoreP1">${scores.P1}</span>
+        <small class="streak-tag" id="streakP1">Streak: ${streaks.P1}</small>
+    `;
+
+    labelP2.innerHTML = `
+        ${getPlayer2Name()} (${p2Sym})
+        <span id="scoreP2">${scores.P2}</span>
+        <small class="streak-tag" id="streakP2">Streak: ${streaks.P2}</small>
+    `;
+
+    const drawEl = document.getElementById("scoreDraw");
+    if (drawEl) drawEl.textContent = scores.Draw;
 
     if (gameActive) {
         updateTurnStatus();
@@ -224,20 +310,18 @@ function updateTurnStatus() {
     }
 }
 
-const winConditions = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8],
-    [0, 3, 6], [1, 4, 7], [2, 5, 8],
-    [0, 4, 8], [2, 4, 6]
-];
-
-cells.forEach(cell => cell.addEventListener('click', handleCellClick));
-
 function handleModeChange() {
     playClickSound();
     const isAiMode = gameModeSelect.value === "ai";
     difficultySelect.disabled = !isAiMode;
     player2Input.disabled = isAiMode;
     player2Input.value = isAiMode ? "Computer" : "Player 2";
+    resetGame(false);
+}
+
+function handleBoardSizeChange() {
+    playClickSound();
+    gridSize = Number(boardSizeSelect.value) === 4 ? 4 : 3;
     resetGame(false);
 }
 
@@ -265,7 +349,7 @@ function triggerAiTurn() {
     setTimeout(() => {
         aiMove();
         isAiThinking = false;
-    }, 380);
+    }, 360);
 }
 
 function makeMove(index, symbol) {
@@ -287,12 +371,12 @@ function addMoveToLog(step, playerName, symbol, index) {
         moveLogEl.innerHTML = "";
     }
     const li = document.createElement('li');
-    li.textContent = `#${step} ${playerName} (${symbol}) → ${cellCoords[index]}`;
+    li.textContent = `#${step} ${playerName} (${symbol}) → ${getCoordLabel(index, gridSize)}`;
     moveLogEl.prepend(li);
 }
 
 function addMatchToHistory(resultText) {
-    const entry = `Round ${roundNumber}: ${resultText}`;
+    const entry = `Round ${roundNumber} [${gridSize}x${gridSize}]: ${resultText}`;
     pastRounds.unshift(entry);
     roundNumber++;
     saveToStorage(STORAGE_KEYS.history, pastRounds);
@@ -309,15 +393,11 @@ function clearHistory() {
     renderMatchHistory();
 }
 
-function getWinner(currentBoard) {
-    for (let condition of winConditions) {
-        const [a, b, c] = condition;
-        if (
-            currentBoard[a] !== "" &&
-            currentBoard[a] === currentBoard[b] &&
-            currentBoard[a] === currentBoard[c]
-        ) {
-            return { winner: currentBoard[a], line: condition };
+function getWinner(currentBoard, lines = winConditions) {
+    for (let condition of lines) {
+        const first = currentBoard[condition[0]];
+        if (first !== "" && condition.every(idx => currentBoard[idx] === first)) {
+            return { winner: first, line: condition };
         }
     }
     if (!currentBoard.includes("")) {
@@ -337,10 +417,16 @@ function checkResult() {
 
         if (outcome.winner === getP1Symbol()) {
             scores.P1++;
+            streaks.P1++;
+            streaks.P2 = 0;
         } else {
             scores.P2++;
+            streaks.P2++;
+            streaks.P1 = 0;
         }
+
         saveToStorage(STORAGE_KEYS.scores, scores);
+        saveToStorage(STORAGE_KEYS.streaks, streaks);
         updatePlayerLabels();
         addMatchToHistory(`${winnerName} won in ${moveCount} moves`);
         playWinSound();
@@ -362,12 +448,43 @@ function checkResult() {
     updateTurnStatus();
 }
 
-// AI Logic (Easy vs Hard Minimax)
+// AI Tactical & Difficulty Helpers
+function findImmediateMove(tempBoard, symbol, emptyIndices) {
+    for (let idx of emptyIndices) {
+        tempBoard[idx] = symbol;
+        const result = getWinner(tempBoard);
+        tempBoard[idx] = "";
+        if (result && result.winner === symbol) {
+            return idx;
+        }
+    }
+    return null;
+}
+
+function scoreBoardHeuristic(tempBoard, aiSymbol, humanSymbol) {
+    let score = 0;
+    for (let line of winConditions) {
+        let aiCount = 0;
+        let humanCount = 0;
+        for (let idx of line) {
+            if (tempBoard[idx] === aiSymbol) aiCount++;
+            else if (tempBoard[idx] === humanSymbol) humanCount++;
+        }
+        if (aiCount > 0 && humanCount === 0) {
+            score += Math.pow(10, aiCount);
+        } else if (humanCount > 0 && aiCount === 0) {
+            score -= Math.pow(12, humanCount);
+        }
+    }
+    return score;
+}
+
 function aiMove() {
     if (!gameActive) return;
 
     const aiSymbol = getP2Symbol();
     const humanSymbol = getP1Symbol();
+    const level = difficultySelect.value;
 
     const emptyIndices = board
         .map((val, idx) => (val === "" ? idx : null))
@@ -375,19 +492,40 @@ function aiMove() {
 
     if (emptyIndices.length === 0) return;
 
-    if (difficultySelect.value === "easy") {
+    // 1. Easy AI: Random move
+    if (level === "easy") {
         const randomMove = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
         makeMove(randomMove, aiSymbol);
         return;
     }
 
-    // Hard AI using Minimax
+    // 2. Medium AI: Win if possible, else block opponent if needed, else random move
+    if (level === "medium") {
+        const winMove = findImmediateMove(board, aiSymbol, emptyIndices);
+        if (winMove !== null) {
+            makeMove(winMove, aiSymbol);
+            return;
+        }
+
+        const blockMove = findImmediateMove(board, humanSymbol, emptyIndices);
+        if (blockMove !== null) {
+            makeMove(blockMove, aiSymbol);
+            return;
+        }
+
+        const randomMove = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+        makeMove(randomMove, aiSymbol);
+        return;
+    }
+
+    // 3. Hard AI: Full Minimax on 3x3, depth-limited Minimax + Heuristic on 4x4
+    const maxDepth = gridSize === 3 ? Infinity : 4;
     let bestScore = -Infinity;
     let bestMove = emptyIndices[0];
 
     for (let idx of emptyIndices) {
         board[idx] = aiSymbol;
-        const score = minimax(board, 0, false, aiSymbol, humanSymbol);
+        const score = minimax(board, 0, false, aiSymbol, humanSymbol, maxDepth);
         board[idx] = "";
 
         if (score > bestScore) {
@@ -399,30 +537,34 @@ function aiMove() {
     makeMove(bestMove, aiSymbol);
 }
 
-function minimax(tempBoard, depth, isMaximizing, aiSymbol, humanSymbol) {
+function minimax(tempBoard, depth, isMaximizing, aiSymbol, humanSymbol, maxDepth) {
     const result = getWinner(tempBoard);
     if (result) {
-        if (result.winner === aiSymbol) return 10 - depth;
-        if (result.winner === humanSymbol) return depth - 10;
+        if (result.winner === aiSymbol) return 100 - depth;
+        if (result.winner === humanSymbol) return depth - 100;
         return 0;
+    }
+
+    if (depth >= maxDepth) {
+        return scoreBoardHeuristic(tempBoard, aiSymbol, humanSymbol);
     }
 
     if (isMaximizing) {
         let bestScore = -Infinity;
-        for (let i = 0; i < 9; i++) {
+        for (let i = 0; i < tempBoard.length; i++) {
             if (tempBoard[i] === "") {
                 tempBoard[i] = aiSymbol;
-                bestScore = Math.max(bestScore, minimax(tempBoard, depth + 1, false, aiSymbol, humanSymbol));
+                bestScore = Math.max(bestScore, minimax(tempBoard, depth + 1, false, aiSymbol, humanSymbol, maxDepth));
                 tempBoard[i] = "";
             }
         }
         return bestScore;
     } else {
         let bestScore = Infinity;
-        for (let i = 0; i < 9; i++) {
+        for (let i = 0; i < tempBoard.length; i++) {
             if (tempBoard[i] === "") {
                 tempBoard[i] = humanSymbol;
-                bestScore = Math.min(bestScore, minimax(tempBoard, depth + 1, true, aiSymbol, humanSymbol));
+                bestScore = Math.min(bestScore, minimax(tempBoard, depth + 1, true, aiSymbol, humanSymbol, maxDepth));
                 tempBoard[i] = "";
             }
         }
@@ -433,21 +575,18 @@ function minimax(tempBoard, depth, isMaximizing, aiSymbol, humanSymbol) {
 function resetGame(resetScores) {
     playClickSound();
 
-    board = ["", "", "", "", "", "", "", "", ""];
+    buildBoardGrid(gridSize);
     currentSymbol = "X";
     gameActive = true;
     isAiThinking = false;
     moveCount = 0;
     moveLogEl.innerHTML = `<li class="empty-msg">No moves yet</li>`;
 
-    cells.forEach(cell => {
-        cell.textContent = "";
-        cell.className = "cell";
-    });
-
     if (resetScores) {
         scores = { P1: 0, P2: 0, Draw: 0 };
+        streaks = { P1: 0, P2: 0 };
         saveToStorage(STORAGE_KEYS.scores, scores);
+        saveToStorage(STORAGE_KEYS.streaks, streaks);
     }
 
     updatePlayerLabels();
@@ -458,6 +597,7 @@ function resetGame(resetScores) {
     }
 }
 
-// Initialize saved settings, scores, history, and labels on load
+// Initialize saved settings, scores, streaks, history, grid, and labels on load
 loadSavedPreferences();
+buildBoardGrid(gridSize);
 updatePlayerLabels();
