@@ -13,6 +13,14 @@ const themeToggleBtn = document.getElementById('themeToggle');
 const moveLogEl = document.getElementById('moveLog');
 const matchHistoryEl = document.getElementById('matchHistory');
 
+const STORAGE_KEYS = {
+    theme: "ttt_theme_v1",
+    sound: "ttt_sound_v1",
+    scores: "ttt_scores_v1",
+    history: "ttt_history_v1",
+    round: "ttt_round_v1"
+};
+
 let board = ["", "", "", "", "", "", "", "", ""];
 let currentSymbol = "X"; // X always starts first
 let gameActive = true;
@@ -21,12 +29,80 @@ let soundEnabled = true;
 let moveCount = 0;
 let roundNumber = 1;
 let scores = { P1: 0, P2: 0, Draw: 0 };
+let pastRounds = [];
 
 const cellCoords = [
     "R1, C1", "R1, C2", "R1, C3",
     "R2, C1", "R2, C2", "R2, C3",
     "R3, C1", "R3, C2", "R3, C3"
 ];
+
+// LocalStorage Helpers
+function saveToStorage(key, value) {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch (err) {
+        // Ignore storage quota/private mode errors
+    }
+}
+
+function loadFromStorage(key, fallback) {
+    try {
+        const raw = localStorage.getItem(key);
+        return raw !== null ? JSON.parse(raw) : fallback;
+    } catch (err) {
+        return fallback;
+    }
+}
+
+function applyThemeUI(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    themeToggleBtn.textContent = theme === "light" ? "Dark Mode" : "Light Mode";
+}
+
+function applySoundUI() {
+    soundToggleBtn.textContent = soundEnabled ? "Sound: ON" : "Sound: OFF";
+}
+
+function renderMatchHistory() {
+    if (!pastRounds.length) {
+        matchHistoryEl.innerHTML = `<li class="empty-msg">No rounds played yet</li>`;
+        return;
+    }
+    matchHistoryEl.innerHTML = "";
+    pastRounds.forEach(entry => {
+        const li = document.createElement('li');
+        li.textContent = entry;
+        matchHistoryEl.appendChild(li);
+    });
+}
+
+function loadSavedPreferences() {
+    const savedTheme = loadFromStorage(STORAGE_KEYS.theme, "dark");
+    applyThemeUI(savedTheme === "light" ? "light" : "dark");
+
+    soundEnabled = Boolean(loadFromStorage(STORAGE_KEYS.sound, true));
+    applySoundUI();
+
+    const savedScores = loadFromStorage(STORAGE_KEYS.scores, null);
+    if (savedScores && typeof savedScores.P1 === "number") {
+        scores = {
+            P1: savedScores.P1,
+            P2: savedScores.P2,
+            Draw: savedScores.Draw
+        };
+    }
+
+    const savedHistory = loadFromStorage(STORAGE_KEYS.history, []);
+    if (Array.isArray(savedHistory)) {
+        pastRounds = savedHistory;
+    }
+
+    const savedRound = Number(loadFromStorage(STORAGE_KEYS.round, 1));
+    roundNumber = Number.isFinite(savedRound) && savedRound > 0 ? savedRound : 1;
+
+    renderMatchHistory();
+}
 
 // Web Audio API Sound Synthesizer
 let audioCtx = null;
@@ -88,17 +164,16 @@ function playClickSound() {
 // Theme & Sound Controls
 function toggleTheme() {
     playClickSound();
-    const html = document.documentElement;
-    const isLight = html.getAttribute("data-theme") === "light";
-    const nextTheme = isLight ? "dark" : "light";
-
-    html.setAttribute("data-theme", nextTheme);
-    themeToggleBtn.textContent = nextTheme === "light" ? "Dark Mode" : "Light Mode";
+    const currentTheme = document.documentElement.getAttribute("data-theme");
+    const nextTheme = currentTheme === "light" ? "dark" : "light";
+    applyThemeUI(nextTheme);
+    saveToStorage(STORAGE_KEYS.theme, nextTheme);
 }
 
 function toggleSound() {
     soundEnabled = !soundEnabled;
-    soundToggleBtn.textContent = soundEnabled ? "Sound: ON" : "Sound: OFF";
+    applySoundUI();
+    saveToStorage(STORAGE_KEYS.sound, soundEnabled);
     if (soundEnabled) playClickSound();
 }
 
@@ -163,12 +238,12 @@ function handleModeChange() {
     difficultySelect.disabled = !isAiMode;
     player2Input.disabled = isAiMode;
     player2Input.value = isAiMode ? "Computer" : "Player 2";
-    resetGame(true);
+    resetGame(false);
 }
 
 function handleSymbolChange() {
     playClickSound();
-    resetGame(true);
+    resetGame(false);
 }
 
 function handleCellClick(e) {
@@ -217,19 +292,21 @@ function addMoveToLog(step, playerName, symbol, index) {
 }
 
 function addMatchToHistory(resultText) {
-    if (matchHistoryEl.querySelector('.empty-msg')) {
-        matchHistoryEl.innerHTML = "";
-    }
-    const li = document.createElement('li');
-    li.textContent = `Round ${roundNumber}: ${resultText}`;
-    matchHistoryEl.prepend(li);
+    const entry = `Round ${roundNumber}: ${resultText}`;
+    pastRounds.unshift(entry);
     roundNumber++;
+    saveToStorage(STORAGE_KEYS.history, pastRounds);
+    saveToStorage(STORAGE_KEYS.round, roundNumber);
+    renderMatchHistory();
 }
 
 function clearHistory() {
     playClickSound();
-    matchHistoryEl.innerHTML = `<li class="empty-msg">No rounds played yet</li>`;
+    pastRounds = [];
     roundNumber = 1;
+    saveToStorage(STORAGE_KEYS.history, pastRounds);
+    saveToStorage(STORAGE_KEYS.round, roundNumber);
+    renderMatchHistory();
 }
 
 function getWinner(currentBoard) {
@@ -263,6 +340,7 @@ function checkResult() {
         } else {
             scores.P2++;
         }
+        saveToStorage(STORAGE_KEYS.scores, scores);
         updatePlayerLabels();
         addMatchToHistory(`${winnerName} won in ${moveCount} moves`);
         playWinSound();
@@ -273,6 +351,7 @@ function checkResult() {
         statusText.textContent = "It's a Draw!";
         gameActive = false;
         scores.Draw++;
+        saveToStorage(STORAGE_KEYS.scores, scores);
         updatePlayerLabels();
         addMatchToHistory(`Draw (${getPlayer1Name()} vs ${getPlayer2Name()})`);
         playDrawSound();
@@ -352,7 +431,7 @@ function minimax(tempBoard, depth, isMaximizing, aiSymbol, humanSymbol) {
 }
 
 function resetGame(resetScores) {
-    if (!resetScores) playClickSound();
+    playClickSound();
 
     board = ["", "", "", "", "", "", "", "", ""];
     currentSymbol = "X";
@@ -368,6 +447,7 @@ function resetGame(resetScores) {
 
     if (resetScores) {
         scores = { P1: 0, P2: 0, Draw: 0 };
+        saveToStorage(STORAGE_KEYS.scores, scores);
     }
 
     updatePlayerLabels();
@@ -378,5 +458,6 @@ function resetGame(resetScores) {
     }
 }
 
-// Initialize labels on load
+// Initialize saved settings, scores, history, and labels on load
+loadSavedPreferences();
 updatePlayerLabels();
