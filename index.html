@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe Web Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Header Section -->
+    <header class="site-header">
+        <div class="header-container">
+            <div class="logo">
+                <span class="logo-x">X</span><span class="logo-o">O</span> TIC TAC TOE
+            </div>
+            <div class="utility-btns">
+                <button type="button" class="icon-btn" id="soundToggle" onclick="toggleSound()">Sound: ON</button>
+                <button type="button" class="icon-btn" id="themeToggle" onclick="toggleTheme()">Light Mode</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game Content -->
+    <main class="game-container">
+        <!-- Player Customization Bar -->
+        <div class="player-setup">
+            <div class="input-group">
+                <label for="player1Name">Player 1</label>
+                <input type="text" id="player1Name" value="Kuldeep" maxlength="14" placeholder="Player 1 Name" oninput="updatePlayerLabels()">
+            </div>
+
+            <div class="input-group">
+                <label for="player1Symbol">P1 Symbol</label>
+                <select id="player1Symbol" onchange="handleSymbolChange()">
+                    <option value="X" selected>Play as X (1st)</option>
+                    <option value="O">Play as O (2nd)</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label for="player2Name">Player 2</label>
+                <input type="text" id="player2Name" value="Player 2" maxlength="14" placeholder="Player 2 Name" oninput="updatePlayerLabels()">
+            </div>
+        </div>
+
+        <!-- Game Mode & Difficulty Controls -->
+        <div class="controls">
+            <select id="gameMode" onchange="handleModeChange()">
+                <option value="pvp">2 Players (Local)</option>
+                <option value="ai">Vs Computer (AI)</option>
+            </select>
+
+            <select id="difficulty" onchange="resetGame(false)" disabled>
+                <option value="easy">AI: Easy</option>
+                <option value="hard" selected>AI: Hard</option>
+            </select>
+
+            <button type="button" class="restart-btn" onclick="resetGame(false)">Restart Round</button>
+        </div>
+
+        <div class="game-workspace">
+            <!-- Left/Center: Board & Scoreboard -->
+            <section class="board-section">
+                <div class="scoreboard">
+                    <div class="score-box x-color" id="labelP1">Kuldeep (X) <span id="scoreP1">0</span></div>
+                    <div class="score-box">Draws <span id="scoreDraw">0</span></div>
+                    <div class="score-box o-color" id="labelP2">Player 2 (O) <span id="scoreP2">0</span></div>
+                </div>
+
+                <div class="status" id="status">Kuldeep's Turn (X)</div>
+
+                <div class="board" id="board">
+                    <div class="cell" data-index="0"></div>
+                    <div class="cell" data-index="1"></div>
+                    <div class="cell" data-index="2"></div>
+                    <div class="cell" data-index="3"></div>
+                    <div class="cell" data-index="4"></div>
+                    <div class="cell" data-index="5"></div>
+                    <div class="cell" data-index="6"></div>
+                    <div class="cell" data-index="7"></div>
+                    <div class="cell" data-index="8"></div>
+                </div>
+            </section>
+
+            <!-- Right: Live Move Log & Match History -->
+            <aside class="history-panel">
+                <div class="panel-header">
+                    <h3>Match History & Log</h3>
+                    <button type="button" class="clear-btn" onclick="clearHistory()">Clear</button>
+                </div>
+
+                <div class="log-block">
+                    <h4>Current Round Moves</h4>
+                    <ul id="moveLog" class="log-list">
+                        <li class="empty-msg">No moves yet</li>
+                    </ul>
+                </div>
+
+                <div class="log-block">
+                    <h4>Past Rounds</h4>
+                    <ul id="matchHistory" class="log-list">
+                        <li class="empty-msg">No rounds played yet</li>
+                    </ul>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <!-- Footer Section -->
+    <footer class="site-footer">
+        <p>X always goes first. Align 3 symbols in a row, column, or diagonal to win.</p>
+        <p class="copyright">© 2026 Tic-Tac-Toe Web Game | Built by Kuldeep Singh</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
