@@ -116,7 +116,6 @@ function loadSavedPreferences() {
 function generateWinConditions(size) {
     const lines = [];
 
-    // Rows
     for (let r = 0; r < size; r++) {
         const row = [];
         for (let c = 0; c < size; c++) {
@@ -125,7 +124,6 @@ function generateWinConditions(size) {
         lines.push(row);
     }
 
-    // Columns
     for (let c = 0; c < size; c++) {
         const col = [];
         for (let r = 0; r < size; r++) {
@@ -134,14 +132,12 @@ function generateWinConditions(size) {
         lines.push(col);
     }
 
-    // Main Diagonal
     const diag1 = [];
     for (let i = 0; i < size; i++) {
         diag1.push(i * size + i);
     }
     lines.push(diag1);
 
-    // Anti Diagonal
     const diag2 = [];
     for (let i = 0; i < size; i++) {
         diag2.push(i * size + (size - 1 - i));
@@ -492,14 +488,12 @@ function aiMove() {
 
     if (emptyIndices.length === 0) return;
 
-    // 1. Easy AI: Random move
     if (level === "easy") {
         const randomMove = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
         makeMove(randomMove, aiSymbol);
         return;
     }
 
-    // 2. Medium AI: Win if possible, else block opponent if needed, else random move
     if (level === "medium") {
         const winMove = findImmediateMove(board, aiSymbol, emptyIndices);
         if (winMove !== null) {
@@ -518,7 +512,6 @@ function aiMove() {
         return;
     }
 
-    // 3. Hard AI: Full Minimax on 3x3, depth-limited Minimax + Heuristic on 4x4
     const maxDepth = gridSize === 3 ? Infinity : 4;
     let bestScore = -Infinity;
     let bestMove = emptyIndices[0];
@@ -541,7 +534,7 @@ function minimax(tempBoard, depth, isMaximizing, aiSymbol, humanSymbol, maxDepth
     const result = getWinner(tempBoard);
     if (result) {
         if (result.winner === aiSymbol) return 100 - depth;
-        if (result.winner === humanSymbol) return depth - 100;
+        if (result.winner === humanSymbol) return depth - 10;
         return 0;
     }
 
@@ -591,13 +584,12 @@ function resetGame(resetScores) {
 
     updatePlayerLabels();
 
-    // If playing vs AI and Player 1 chose O, AI (X) makes the first move
     if (gameModeSelect.value === "ai" && getP1Symbol() === "O") {
         triggerAiTurn();
     }
 }
 
-// Initialize saved settings, scores, streaks, history, grid, and labels on load
+// Initialize on load
 loadSavedPreferences();
 buildBoardGrid(gridSize);
 updatePlayerLabels();
